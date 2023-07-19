@@ -1,4 +1,4 @@
-name: Run Coding Standards Tests
+name: Run Static Analysis Tests
 
 decsription: Sets up PHP and its dependencies and runs PHPCS and PHPStan tests.
 
