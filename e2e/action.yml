@@ -14,12 +14,15 @@ runs:
       with:
         node-version: 16
     - run: npm ci
+      shell: bash
     - run: npm run build --if-present
+      shell: bash
 
     - name: Install Playwright dependencies
         # Only Chromium for the moment.
       run: |
         npx playwright install chromium --with-deps
+      shell: bash
 
     # Must install PHP deps before wp-env is running to prevent errors.
     - name: Set up PHP
@@ -37,9 +40,11 @@ runs:
     - name: Install WordPress and start the server
       run: |
         npm run wp-env start
+      shell: bash
       env:
         WP_ENV_PHP_VERSION: '8.0'
 
     - name: Run Playwright tests
       run: |
         npx playwright test --config tests/e2e/playwright.config.js
+      shell: bash
