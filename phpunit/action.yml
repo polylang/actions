@@ -45,7 +45,7 @@ runs:
         dependency-versions: 'highest'
 
     - name: Set up WordPress ${{ inputs.wordpress-version }} and WordPress Test Library
-      uses: sjinks/setup-wordpress-test-library@v1.1
+      uses: sjinks/setup-wordpress-test-library@1.1.19
       with:
         version: ${{ inputs.wordpress-version }}
 
