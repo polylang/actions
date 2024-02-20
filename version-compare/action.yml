@@ -1,0 +1,35 @@
+name: Sementic Versions Compare
+
+description: Compares two versions. If 'dev', 'nightly' or 'latest' is given it'll be considered as the highest version possible.
+
+inputs:
+  head:
+    description: First version number.
+    required: true
+    type: string
+  base:
+    description: Second version number.
+    required: true
+    type: string
+  operator:
+    description: Operator, accepts '<', '>' and '='. Default to '<'.
+    required: true
+    type: string
+    default: '<'
+
+outputs:
+  result:
+    description: Whether or not the version comparison it correct.
+    value: ${{ steps.compare.outputs.result }}
+
+permissions:
+  contents: read
+
+runs:
+  using: 'composite'
+
+  steps:
+  - name: Compare versions
+    id: compare
+    run: bash ${{ github.action_path }}/../bin/version-compare.sh "${{ inputs.head }}" "${{ inputs.base }}" "${{ inputs.operator }}"
+    shell: bash

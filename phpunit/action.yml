@@ -30,9 +30,16 @@ runs:
         coverage: none
         php-version: ${{ inputs.php-version }}
 
-    - name: Clean PHP Dependencies
+    - name: Check version requirement
+      id: version-compare
+      uses: polylang/actions/version-compare@ver-comp
+      with:
+        head: ${{ inputs.wordpress-version }}
+        base: "5.9"
+
+    - name: Clean PHP dependencies
       run: |
-        if [[ ${{ inputs.wordpress-version }} == "5.8.x" ]]; then
+        if [[ ${{ steps.version-compare.outputs.result }} == true ]]; then
           composer require --no-interaction --no-update --ignore-platform-reqs --dev "phpunit/phpunit ^7.5"
         fi
         composer remove --no-interaction --no-update --dev "phpstan/phpstan"
