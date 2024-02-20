@@ -57,7 +57,10 @@ runs:
         version: ${{ inputs.wordpress-version }}
 
     - name: Set up plugins and themes dependencies
-      run: "bash ./tests/bin/install-plugins.sh"
+      run: |
+        if [[ -f ./tests/bin/install-plugins.sh ]]; then
+          bash ./tests/bin/install-plugins.sh
+        fi
       shell: bash
 
     - name: Run PHPUnit tests
