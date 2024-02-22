@@ -49,9 +49,7 @@ case $? in
 esac
 if [[ $op != $3 ]]
 then
-	# echo "result=$(echo false)" >> $GITHUB_OUTPUT
-	echo false
+	echo "result=$(echo false)" >> $GITHUB_OUTPUT
 else
-	# echo "result=$(echo true)" >> $GITHUB_OUTPUT
-	echo true
+	echo "result=$(echo true)" >> $GITHUB_OUTPUT
 fi
