@@ -4,12 +4,12 @@ version_compare () {
     if [[ $1 == 'latest' ]] || [[ $1 == 'dev' ]] || [[ $1 == 'nightly' ]]
     then
 		# Set first arg to a huge number considering latest, dev or nightly to be the highest version.
-        set -- 1000000 "${@:2:3}"
+        set -- 1000000 "${@:2}"
     fi
     if [[ $2 == 'latest' ]] || [[ $2 == 'dev' ]] || [[ $2 == 'nightly' ]]
     then
 		# Set second arg to a huge number considering latest, dev or nightly to be the highest version.
-        set -- "${@:1}" 1000000 "${@:3}"
+        set -- "${@:1:1}" 1000000
     fi
     if [[ $1 == $2 ]]
     then
@@ -49,7 +49,9 @@ case $? in
 esac
 if [[ $op != $3 ]]
 then
-	echo "result=$(echo false)" >> $GITHUB_OUTPUT
+	# echo "result=$(echo false)" >> $GITHUB_OUTPUT
+	echo false
 else
-	echo "result=$(echo true)" >> $GITHUB_OUTPUT
+	# echo "result=$(echo true)" >> $GITHUB_OUTPUT
+	echo true
 fi
