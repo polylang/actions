@@ -12,10 +12,10 @@ inputs:
     required: true
     type: string
   operator:
-    description: Operator, accepts '<', '>' and '='. Default to '<'.
+    description: Operator, accepts 'lt', 'gt' and 'eq'. Default to 'lt'.
     required: true
     type: string
-    default: '<'
+    default: 'lt'
 
 outputs:
   result:
