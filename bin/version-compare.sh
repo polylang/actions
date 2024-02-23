@@ -14,7 +14,7 @@ fi
 
 if dpkg --compare-versions $1 $3 $2
 then
-	echo "result=$(echo true)" >> $GITHUB_OUTPUT
+	echo "result=true" >> $GITHUB_OUTPUT
 else
-	echo "result=$(echo false)" >> $GITHUB_OUTPUT
+	echo "result=false" >> $GITHUB_OUTPUT
 fi
