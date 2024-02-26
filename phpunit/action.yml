@@ -32,7 +32,7 @@ runs:
 
     - name: Check version requirement
       id: version-compare
-      uses: polylang/actions/version-compare@ver-comp
+      uses: polylang/actions/version-compare@main
       with:
         head: ${{ inputs.wordpress-version }}
         base: "5.9"
