@@ -5,15 +5,16 @@ decsription: Sends Slack notifications.
 inputs:
   status:
     description: Whether to notify for a successful, a failed or a cancelled CI. Pass job status for ease, or hexadecimal code otherwise to display weird things (e.g. \#ff00ff).
-    required: true
-    type: boolean
+    required: false
+    type: string
+    default: '#ff00ff'
   webhook:
     description: Slack webhook to send notification.
     required: true
     type: string
   message:
     description: Slack message to display along the notification.
-    required: true
+    required: false
     type: string
     default: <https://www.youtube.com/watch?v=dQw4w9WgXcQ|Something happened.>
 
