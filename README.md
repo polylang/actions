@@ -1,6 +1,7 @@
 # Actions
 Shared GitHub actions for Polylang projects. Provides the following actions:
 - PHPUnit
-- Coding Standard (PHPCS and PHPStan)
+- PHP Coding Standard (PHPCS and PHPStan)
 - Playwright
-- Slack Notifications (still a WIP)
+- JS and CSS Coding Standard (ESLint)
+- Slack Notifications
