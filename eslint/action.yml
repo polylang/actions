@@ -39,15 +39,14 @@ runs:
       shell: bash
 
     - name: Analyze JS
-      if: ${{ inputs.do-js }}
+      if: ${{ inputs.do-js === 'true' }}
       run: |
         npx wp-scripts lint-js ${{ inputs.js-path }}
       shell: bash
 
     - name: Analyze CSS and Saas
-      if: ${{ inputs.do-style }}
+      if: ${{ inputs.do-style === 'true' }}
       run: |
-        echo ${{ inputs.do-style }}
         npx wp-scripts lint-style ${{ inputs.style-path }}
       shell: bash
 
