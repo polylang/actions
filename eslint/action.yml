@@ -39,13 +39,13 @@ runs:
       shell: bash
 
     - name: Analyze JS
-      if: inputs.do-js
+      if: ${{ inputs.do-js }}
       run: |
         npx wp-scripts lint-js ${{ inputs.js-path }}
       shell: bash
 
     - name: Analyze CSS and Saas
-      if: inputs.do-style
+      if: ${{ inputs.do-style }}
       run: |
         npx wp-scripts lint-style ${{ inputs.style-path }}
       shell: bash
