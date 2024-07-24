@@ -45,8 +45,9 @@ runs:
       shell: bash
 
     - name: Analyze CSS and Saas
-      if: ${{ echo inputs.do-style }}
+      if: ${{ inputs.do-style }}
       run: |
+        echo ${{ inputs.do-style }}
         npx wp-scripts lint-style ${{ inputs.style-path }}
       shell: bash
 
