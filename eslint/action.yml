@@ -17,7 +17,7 @@ inputs:
     required: true
     type: boolean
   style-path:
-    description: Path to JS file to analyze. Default to empty string, meaning it will analyze *all* files.
+    description: Path to CSS or Sass file to analyze. Default to empty string, meaning it will analyze *all* files.
     required: false
     type: string
     default: ''
@@ -30,7 +30,7 @@ runs:
 
   steps:
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: 20
 
