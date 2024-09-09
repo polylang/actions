@@ -1,0 +1,52 @@
+name: Run ESLint Static Analysis
+
+description: Sets up Node and its dependencies then run ESLint on JS files using wordpress/scripts package.
+
+inputs:
+  do-js:
+    description: Whether or not to analyze JS files.
+    required: true
+    type: boolean
+  js-path:
+    description: Path to JS file to analyze. Default to empty string, meaning it will analyze *all* files.
+    required: false
+    type: string
+    default: ''
+  do-style:
+    description: Whether or not to analyze CSS and Sass files.
+    required: true
+    type: boolean
+  style-path:
+    description: Path to CSS or Sass file to analyze. Default to empty string, meaning it will analyze *all* files.
+    required: false
+    type: string
+    default: ''
+
+permissions:
+  contents: read
+
+runs:
+  using: 'composite'
+
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install dependencies
+      run: npm install
+      shell: bash
+
+    - name: Analyze JS
+      if: ${{ inputs.do-js == 'true' }}
+      run: |
+        npx wp-scripts lint-js ${{ inputs.js-path }}
+      shell: bash
+
+    - name: Analyze CSS and Saas
+      if: ${{ inputs.do-style == 'true' }}
+      run: |
+        npx wp-scripts lint-style ${{ inputs.style-path }}
+      shell: bash
+

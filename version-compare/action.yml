@@ -1,4 +1,4 @@
-name: Sementic Versions Compare
+name: Semantic Versions Compare
 
 description: Compares two versions. If 'dev', 'nightly' or 'latest' is given it'll be considered as the highest version possible.
 
