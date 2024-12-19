@@ -51,6 +51,15 @@ runs:
       with:
         dependency-versions: 'highest'
 
+    - name: Install SVN
+      # SVN is required by sjinks/setup-wordpress-test-library.
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y subversion
+
+  - name: Has SVN?
+    run: which svn || exit 1
+
     - name: Set up WordPress ${{ inputs.wordpress-version }} and WordPress Test Library
       uses: sjinks/setup-wordpress-test-library@v2.1.3
       with:
