@@ -56,9 +56,11 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y subversion
+      shell: bash
 
     - name: Has SVN?
       run: which svn || exit 1
+      shell: bash
 
     - name: Set up WordPress ${{ inputs.wordpress-version }} and WordPress Test Library
       uses: sjinks/setup-wordpress-test-library@v2.1.3
