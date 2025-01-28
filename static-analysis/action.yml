@@ -21,7 +21,7 @@ runs:
       dependency-versions: 'highest'
 
   - name: Run PHPStan
-    run: vendor/bin/phpstan analyze --memory-limit=1500M
+    run: vendor/bin/phpstan analyze --memory-limit=2000M
     shell: bash
 
   - name: Run PHPCS
