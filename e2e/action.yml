@@ -46,7 +46,7 @@ runs:
 
     - name: Run Playwright tests
       run: |
-        npx playwright test --config tests/e2e/playwright.config.js
+        npm run test:e2e
       shell: bash
 
     - name: Upload Playwright report
