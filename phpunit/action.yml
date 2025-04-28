@@ -24,21 +24,6 @@ runs:
   using: 'composite'
 
   steps:
-    - name: Prepare environment for APT
-      run: |
-        # Creating apt config files
-        echo 'APT::Get::AllowReleaseInfoChange "true";' | sudo tee /etc/apt/apt.conf.d/99allow-release-info-change
-        echo 'APT::Key::Assert-Pubkey-Algo ">=rsa1024";' | sudo tee /etc/apt/apt.conf.d/99weakkey-warning
-        # Set environment variable to ignore the label changes
-        echo "DEBIAN_FRONTEND=noninteractive" >> $GITHUB_ENV
-        # Apply settings for existing apt config
-        sudo sed -i 's/^APT::Get::AllowReleaseInfoChange.*$/APT::Get::AllowReleaseInfoChange "true";/' /etc/apt/apt.conf 2>/dev/null || true
-      shell: bash
-
-    - name: Update apt repositories
-      run: sudo DEBIAN_FRONTEND=noninteractive apt-get update -y --allow-releaseinfo-change
-      shell: bash
-
     - name: Set up PHP ${{ inputs.php-version }}
       uses: shivammathur/setup-php@v2
       with:
@@ -69,8 +54,8 @@ runs:
     - name: Install SVN
       # SVN is required by sjinks/setup-wordpress-test-library.
       run: |
-        sudo DEBIAN_FRONTEND=noninteractive apt-get update -y --allow-releaseinfo-change
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y subversion
+        sudo apt-get update -y --allow-releaseinfo-change
+        sudo apt-get install -y subversion
         svn --version
       shell: bash
 
