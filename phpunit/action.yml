@@ -24,8 +24,14 @@ runs:
   using: 'composite'
 
   steps:
-    - name: Update apt repositories with --allow-releaseinfo-change
-      run: sudo apt-get update -y --allow-releaseinfo-change
+    - name: Configure APT to handle repository changes and weak keys
+      run: |
+        echo 'APT::Get::AllowReleaseInfoChange "true";' | sudo tee /etc/apt/apt.conf.d/99allow-release-info-change
+        echo 'APT::Key::Assert-Pubkey-Algo ">=rsa1024";' | sudo tee /etc/apt/apt.conf.d/99weakkey-warning
+      shell: bash
+
+    - name: Update apt repositories
+      run: sudo apt-get update -y
       shell: bash
 
     - name: Set up PHP ${{ inputs.php-version }}
@@ -58,7 +64,7 @@ runs:
     - name: Install SVN
       # SVN is required by sjinks/setup-wordpress-test-library.
       run: |
-        sudo apt-get update -y --allow-releaseinfo-change
+        sudo apt-get update -y
         sudo apt-get install -y subversion
         svn --version
       shell: bash
