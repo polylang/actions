@@ -54,7 +54,7 @@ runs:
     - name: Install SVN
       # SVN is required by sjinks/setup-wordpress-test-library.
       run: |
-        sudo apt-get update
+        sudo apt-get update -y --allow-releaseinfo-change
         sudo apt-get install -y subversion
         svn --version
       shell: bash
