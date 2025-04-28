@@ -24,6 +24,10 @@ runs:
   using: 'composite'
 
   steps:
+    - name: Update apt repositories with --allow-releaseinfo-change
+      run: sudo apt-get update -y --allow-releaseinfo-change
+      shell: bash
+
     - name: Set up PHP ${{ inputs.php-version }}
       uses: shivammathur/setup-php@v2
       with:
@@ -54,7 +58,7 @@ runs:
     - name: Install SVN
       # SVN is required by sjinks/setup-wordpress-test-library.
       run: |
-        sudo apt-get update
+        sudo apt-get update -y --allow-releaseinfo-change
         sudo apt-get install -y subversion
         svn --version
       shell: bash
