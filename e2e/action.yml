@@ -68,7 +68,7 @@ runs:
       uses: ramsey/composer-install@v3
       with:
         dependency-versions: 'highest'
-        composer-options: '--no-dev'
+        composer-options: '--no-dev --optimize-autoloader'
 
     - name: Install WordPress and start the server
       run: |
