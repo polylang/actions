@@ -13,16 +13,47 @@ runs:
       uses: actions/setup-node@v3
       with:
         node-version: 22
-    - run: npm install
-      shell: bash
-    - run: npm run build --if-present
+
+    - name: Set up package-lock.json
+      run: |
+        npm install --package-lock-only
       shell: bash
 
-    - name: Install Playwright dependencies
-        # Only Chromium for the moment.
+    - name: Cache node_modules
+      id: cache-node_modules
+      uses: actions/cache@v4
+      with:
+          path: '**/node_modules'
+          key: node_modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Install dependencies
+      if: ${{ steps.cache-node_modules.outputs.cache-hit != 'true' }}
+      run: |
+          npm install
+      shell: bash
+
+    - name: Build dependencies
+      run: npm run build --if-present
+      shell: bash
+
+    - name: Get installed Playwright version
+      id: playwright-version
+      run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').dependencies['@playwright/test'].version)")" >> $GITHUB_ENV
+
+    - name: Cache Playwright binaries
+      uses: actions/cache@v3
+      id: playwright-cache
+      with:
+        path: |
+          ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+
+    - name: Install Playwright binaries
+      # Only Chromium for the moment.
       run: |
         npx playwright install chromium --with-deps
       shell: bash
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
 
     # Must install PHP deps before wp-env is running to prevent errors.
     - name: Set up PHP
