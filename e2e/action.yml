@@ -16,7 +16,7 @@ runs:
 
     - name: Set up package-lock.json
       run: |
-        npm install --package-lock-only --no-audit --only=prod
+        npm install --package-lock-only --no-audit
       shell: bash
 
     - name: Cache node_modules
