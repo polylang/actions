@@ -16,7 +16,7 @@ runs:
 
     - name: Set up package-lock.json
       run: |
-        npm install --package-lock-only
+        npm install --package-lock-only --no-audit --only=prod
       shell: bash
 
     - name: Cache node_modules
@@ -29,7 +29,7 @@ runs:
     - name: Install dependencies
       if: ${{ steps.cache-node_modules.outputs.cache-hit != 'true' }}
       run: |
-          npm install
+          npm ci
       shell: bash
 
     - name: Build dependencies
