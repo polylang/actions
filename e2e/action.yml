@@ -94,6 +94,7 @@ runs:
     - name: Restore wp-env container
       if: steps.wp-env-cache.outputs.cache-hit == 'true'
       run: |
+        mkdir -p ~/wp-env/
         cp -r ~/.cache/wp-env-backup/* ~/wp-env/
       shell: bash
 
