@@ -2,6 +2,13 @@ name: Run Playwright e2e Tests
 
 description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. Currently runs on PHP 8.0 with WordPress latest release.
 
+inputs:
+  container-cache-key:
+    description: Container cache key. Used to cache wp-env container.
+    required: false
+    type: string
+    default: 'no-external-cache-key'
+
 permissions:
   contents: read
 
@@ -70,12 +77,38 @@ runs:
         dependency-versions: 'highest'
         composer-options: '--no-dev --optimize-autoloader'
 
+    - name: Get WordPress latest version
+      id: wp-version
+      run: |
+        echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Check wp-env cached container
+      uses: actions/cache@v4
+      id: wp-env-cache
+      with:
+        path: |
+          ~/.cache/wp-env-backup
+        key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ inputs.container-cache-key }}
+
+    - name: Restore wp-env container
+      if: steps.wp-env-cache.outputs.cache-hit == 'true'
+      run: |
+        cp -r ~/.cache/wp-env-backup/* ~/wp-env/
+      shell: bash
+
     - name: Install WordPress and start the server
       run: |
         npm run wp-env start
       shell: bash
       env:
         WP_ENV_PHP_VERSION: '8.0'
+
+    - name: Cache wp-env container
+      if: steps.wp-env-cache.outputs.cache-hit != 'true'
+      run: |
+        cp -r ~/wp-env/* ~/.cache/wp-env-backup/
+      shell: bash
 
     - name: Run Playwright tests
       run: |
