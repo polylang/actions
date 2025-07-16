@@ -107,7 +107,7 @@ runs:
       if: steps.docker-cache.outputs.cache-hit != 'true'
       run: |
         docker image ls
-        docker save $(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'wp-env') -o wp-env-image.tar
+        docker save $(docker images --format '{{.Repository}}:{{.Tag}}') -o wp-env-image.tar
       shell: bash
 
     - name: Run Playwright tests
