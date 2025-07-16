@@ -94,6 +94,7 @@ runs:
       if: steps.docker-cache.outputs.cache-hit == 'true'
       run: |
         docker load -i wp-env-image.tar
+      shell: bash
 
     - name: Install WordPress and start the server
       run: |
@@ -107,11 +108,6 @@ runs:
       run: |
         docker image ls
         docker save $(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'wp-env') -o wp-env-image.tar
-
-    - name: Cache wp-env container
-      if: steps.wp-env-cache.outputs.cache-hit != 'true'
-      run: |
-        cp -r ~/wp-env/* ~/.cache/wp-env-backup/
       shell: bash
 
     - name: Run Playwright tests
