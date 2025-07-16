@@ -83,20 +83,17 @@ runs:
         echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> $GITHUB_ENV
       shell: bash
 
-    - name: Check wp-env cached container
+    - name: Cache wp-env Docker image
+      id: docker-cache
       uses: actions/cache@v4
-      id: wp-env-cache
       with:
-        path: |
-          ~/.cache/wp-env-backup
+        path: wp-env-image.tar
         key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ inputs.container-cache-key }}
 
-    - name: Restore wp-env container
-      if: steps.wp-env-cache.outputs.cache-hit == 'true'
+    - name: Load cached Docker image (if any)
+      if: steps.docker-cache.outputs.cache-hit == 'true'
       run: |
-        mkdir -p ~/wp-env/
-        cp -r ~/.cache/wp-env-backup/* ~/wp-env/
-      shell: bash
+        docker load -i wp-env-image.tar
 
     - name: Install WordPress and start the server
       run: |
@@ -104,6 +101,12 @@ runs:
       shell: bash
       env:
         WP_ENV_PHP_VERSION: '8.0'
+
+    - name: Save Docker image to cache
+      if: steps.docker-cache.outputs.cache-hit != 'true'
+      run: |
+        docker image ls
+        docker save $(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'wp-env') -o wp-env-image.tar
 
     - name: Cache wp-env container
       if: steps.wp-env-cache.outputs.cache-hit != 'true'
