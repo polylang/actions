@@ -2,6 +2,13 @@ name: Run Playwright e2e Tests
 
 description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. Currently runs on PHP 8.0 with WordPress latest release.
 
+inputs:
+  container-cache-key:
+    description: Container cache key. Used to cache wp-env container.
+    required: false
+    type: string
+    default: 'no-external-cache-key'
+
 permissions:
   contents: read
 
@@ -10,19 +17,52 @@ runs:
 
   steps:
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: 22
-    - run: npm install
-      shell: bash
-    - run: npm run build --if-present
+
+    - name: Set up package-lock.json
+      run: |
+        npm install --package-lock-only --no-audit
       shell: bash
 
-    - name: Install Playwright dependencies
-        # Only Chromium for the moment.
+    - name: Cache node_modules
+      id: cache-node_modules
+      uses: actions/cache@v4
+      with:
+          path: '**/node_modules'
+          key: node_modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Install dependencies
+      if: ${{ steps.cache-node_modules.outputs.cache-hit != 'true' }}
+      run: |
+          npm ci
+      shell: bash
+
+    - name: Build dependencies
+      run: npm run build --if-present
+      shell: bash
+
+    - name: Get installed Playwright version
+      id: playwright-version
+      run: |
+        echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').packages['node_modules/@playwright/test'].version)")" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Cache Playwright binaries
+      uses: actions/cache@v4
+      id: playwright-cache
+      with:
+        path: |
+          ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+
+    - name: Install Playwright binaries
+      # Only Chromium for the moment.
       run: |
         npx playwright install chromium --with-deps
       shell: bash
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
 
     # Must install PHP deps before wp-env is running to prevent errors.
     - name: Set up PHP
@@ -35,7 +75,26 @@ runs:
       uses: ramsey/composer-install@v3
       with:
         dependency-versions: 'highest'
-        composer-options: '--no-dev'
+        composer-options: '--no-dev --optimize-autoloader'
+
+    - name: Get WordPress latest version
+      id: wp-version
+      run: |
+        echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Cache wp-env Docker image
+      id: docker-cache
+      uses: actions/cache@v4
+      with:
+        path: wp-env-image.tar
+        key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ inputs.container-cache-key }}
+
+    - name: Load cached Docker image (if any)
+      if: steps.docker-cache.outputs.cache-hit == 'true'
+      run: |
+        docker load -i wp-env-image.tar
+      shell: bash
 
     - name: Install WordPress and start the server
       run: |
@@ -43,6 +102,13 @@ runs:
       shell: bash
       env:
         WP_ENV_PHP_VERSION: '8.0'
+
+    - name: Save Docker image to cache
+      if: steps.docker-cache.outputs.cache-hit != 'true'
+      run: |
+        docker image ls
+        docker save $(docker images --format '{{.Repository}}:{{.Tag}}') -o wp-env-image.tar
+      shell: bash
 
     - name: Run Playwright tests
       run: |
