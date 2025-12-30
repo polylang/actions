@@ -39,6 +39,19 @@ runs:
           npm ci
       shell: bash
 
+    # Must install PHP deps before wp-env is running to prevent errors.
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        coverage: none
+        php-version: '8.0'
+
+    - name: Install PHP Dependencies
+      uses: ramsey/composer-install@v3
+      with:
+        dependency-versions: 'highest'
+        composer-options: '--no-dev --optimize-autoloader'
+
     - name: Build dependencies
       run: npm run build --if-present
       shell: bash
@@ -63,19 +76,6 @@ runs:
         npx playwright install chromium --with-deps
       shell: bash
       if: steps.playwright-cache.outputs.cache-hit != 'true'
-
-    # Must install PHP deps before wp-env is running to prevent errors.
-    - name: Set up PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        coverage: none
-        php-version: '8.0'
-
-    - name: Install PHP Dependencies
-      uses: ramsey/composer-install@v3
-      with:
-        dependency-versions: 'highest'
-        composer-options: '--no-dev --optimize-autoloader'
 
     - name: Get WordPress latest version
       id: wp-version
