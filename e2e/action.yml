@@ -103,7 +103,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: wp-env-image.tar
-        key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ inputs.container-cache-key }}
+        key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json', '.wp-env.override.json', inputs.wp-env-config-path) }}-${{ inputs.container-cache-key }}
 
     - name: Load cached Docker image (if any)
       if: steps.docker-cache.outputs.cache-hit == 'true'
@@ -123,8 +123,11 @@ runs:
     - name: Save Docker image to cache
       if: steps.docker-cache.outputs.cache-hit != 'true'
       run: |
-        docker image ls
-        docker save $(docker images --format '{{.Repository}}:{{.Tag}}') -o wp-env-image.tar
+        if [ -n "${{ inputs.wp-env-config-path }}" ]; then
+          node "${{ github.action_path }}/../bin/save-wp-env-docker-images.js" --config="${{ inputs.wp-env-config-path }}"
+        else
+          node "${{ github.action_path }}/../bin/save-wp-env-docker-images.js"
+        fi
       shell: bash
 
     - name: Run Playwright tests with WordPress ${{ env.WP_VERSION }}
