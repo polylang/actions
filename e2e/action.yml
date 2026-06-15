@@ -8,6 +8,16 @@ inputs:
     required: false
     type: string
     default: 'no-external-cache-key'
+  wp-env-config-path:
+    description: Path to a custom wp-env config file passed to wp-env --config. Default is '' (wp-env default discovery).
+    required: false
+    type: string
+    default: ''
+  playwright-cmd:
+    description: CLI command to run playwright tests. Default is 'npm run test:e2e'.
+    required: false
+    type: string
+    default: 'npm run test:e2e'
 
 runs:
   using: 'composite'
@@ -95,10 +105,12 @@ runs:
 
     - name: Install WordPress and start the server
       run: |
-        npm run wp-env start
+        if [ -n "${{ inputs.wp-env-config-path }}" ]; then
+          npm run wp-env start -- --config="${{ inputs.wp-env-config-path }}"
+        else
+          npm run wp-env start
+        fi
       shell: bash
-      env:
-        WP_ENV_PHP_VERSION: '8.0'
 
     - name: Save Docker image to cache
       if: steps.docker-cache.outputs.cache-hit != 'true'
@@ -107,9 +119,8 @@ runs:
         docker save $(docker images --format '{{.Repository}}:{{.Tag}}') -o wp-env-image.tar
       shell: bash
 
-    - name: Run Playwright tests
-      run: |
-        npm run test:e2e
+    - name: Run Playwright tests with WordPress ${{ env.WP_VERSION }}
+      run: ${{ inputs.playwright-cmd }}
       shell: bash
 
     - name: Upload Playwright report
