@@ -28,6 +28,11 @@ runs:
       with:
         node-version: 22
 
+    - name: Get Node.js version
+      id: node-version
+      run: echo "NODE_VERSION=$(node -v)" >> "$GITHUB_OUTPUT"
+      shell: bash
+
     - name: Set up package-lock.json
       run: |
         npm install --package-lock-only --no-audit
@@ -38,7 +43,7 @@ runs:
       uses: actions/cache@v4
       with:
           path: '**/node_modules'
-          key: node_modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+          key: node_modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('package.json', 'package-lock.json') }}
 
     - name: Install dependencies
       if: ${{ steps.cache-node_modules.outputs.cache-hit != 'true' }}
