@@ -9,9 +9,6 @@ inputs:
     type: string
     default: 'no-external-cache-key'
 
-permissions:
-  contents: read
-
 runs:
   using: 'composite'
 
