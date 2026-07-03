@@ -1,9 +1,6 @@
 name: Run Static Analysis Tests
 
-decsription: Sets up PHP and its dependencies and runs PHPCS and PHPStan tests.
-
-permissions:
-  contents: read
+description: Sets up PHP and its dependencies and runs PHPCS and PHPStan tests.
 
 runs:
   using: 'composite'
@@ -25,5 +22,6 @@ runs:
     shell: bash
 
   - name: Run PHPCS
+    if: success() || failure()
     run: vendor/bin/phpcs
     shell: bash
