@@ -178,12 +178,14 @@ runs:
           }
           const sha = context.sha.substring(0, 7);
 
-          const body = `${marker}
-          📦 **Distribution ZIP** (\`${mode}\`)
-
-          Download: [${artifactName}](${downloadUrl})
-
-          Built from commit \`${sha}\`.`;
+          const body = [
+            marker,
+            `📦 **Distribution ZIP** (\`${mode}\`)`,
+            '',
+            `Download: [${artifactName}](${downloadUrl})`,
+            '',
+            `Built from commit \`${sha}\`.`,
+          ].join('\n');
 
           let prNumber = null;
 
