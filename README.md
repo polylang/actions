@@ -5,3 +5,4 @@ Shared GitHub actions for Polylang projects. Provides the following actions:
 - Playwright
 - JS and CSS Coding Standard (ESLint)
 - Slack Notifications
+- Distribute

@@ -1,0 +1,292 @@
+# actions/distribute/action.yml
+#
+# Prerequisites (caller workflow):
+#   1. actions/checkout@v4 with fetch-depth: 0 (before this action)
+#   2. WP Syntex repository (polylang or wpsyntex org, not a fork)
+#   3. Job permissions (caller must set explicitly):
+#        contents: read          # checkout
+#        actions: write          # upload artifact
+#        pull-requests: write    # PR comment (optional if no PR context)
+#   4. @wpsyntex/distribute in devDependencies (distribute installs npm deps during build)
+#   5. env COMPOSER_AUTH on the step (if private Composer packages)
+
+name: Build distribution ZIP
+description: |
+  Builds a WordPress plugin/theme distribution ZIP using @wpsyntex/distribute,
+  uploads it as a GitHub Actions artifact, and posts a download link.
+
+  **Caller workflow must set job permissions:**
+  ```yaml
+  permissions:
+    contents: read
+    actions: write
+    pull-requests: write
+  ```
+
+  **Prerequisites:** WP Syntex repository only (`polylang` or `wpsyntex` org,
+  not a fork). Run `actions/checkout@v4` with `fetch-depth: 0` before this
+  action. Add `@wpsyntex/distribute` to `devDependencies`; it installs
+  consumer npm dependencies during the build. Pass `COMPOSER_AUTH` via `env`
+  if needed.
+
+inputs:
+  mode:
+    description: Distribution mode (production or dev).
+    required: false
+    default: production
+  version:
+    description: Version strategy (commit, tag) or literal string.
+    required: false
+    default: commit
+  npm-cmd:
+    description: Override npm build script to run.
+    required: false
+  node-version:
+    description: Node.js version.
+    required: false
+    default: "22"
+  php-version:
+    description: PHP version.
+    required: false
+    default: "8.5"
+  retention-days:
+    description: Artifact retention in days.
+    required: false
+    default: "30"
+
+outputs:
+  artifact-name:
+    description: Uploaded artifact name.
+    value: ${{ steps.name.outputs.artifact-name }}
+  artifact-url:
+    description: Authenticated download URL for the ZIP artifact.
+    value: ${{ steps.upload.outputs.artifact-url }}
+  run-url:
+    description: GitHub Actions run page (fallback link).
+    value: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+runs:
+  using: composite
+
+  steps:
+    - name: Restrict to team repositories
+      shell: bash
+      run: |
+        case "${{ github.repository_owner }}" in
+          polylang|wpsyntex) ;;
+          *)
+            echo "::error::This action is reserved for WP Syntex repositories."
+            exit 1
+            ;;
+        esac
+
+        if [[ "${{ github.event.repository.fork }}" == "true" ]]; then
+          echo "::error::This action is not available on forked repositories."
+          exit 1
+        fi
+
+        if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+          echo "::error::This action does not run on pull requests from forks."
+          exit 1
+        fi
+
+    - name: Set up PHP ${{ inputs.php-version }}
+      uses: shivammathur/setup-php@v2
+      with:
+        coverage: none
+        php-version: ${{ inputs.php-version }}
+        tools: composer
+
+    - name: Set up Node ${{ inputs.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Run distribute
+      id: distribute
+      shell: bash
+      run: |
+        if [[ ! -f package.json ]]; then
+          echo "::error::package.json is required"
+          exit 1
+        fi
+
+        VERSION=$(node -p "require('./package.json').devDependencies?.['@wpsyntex/distribute'] || ''" 2>/dev/null || echo "")
+        if [[ -z "$VERSION" ]]; then
+          echo "::error::Add @wpsyntex/distribute to devDependencies in package.json"
+          exit 1
+        fi
+
+        SEQUENTIAL=""
+        if [[ "${RUNNER_DEBUG}" == "1" || "${ACTIONS_STEP_DEBUG}" == "true" || "${ACTIONS_RUNNER_DEBUG}" == "true" ]]; then
+          SEQUENTIAL="--sequential"
+        fi
+
+        ARGS=(--mode "${{ inputs.mode }}" --version "${{ inputs.version }}")
+        if [[ -n "$SEQUENTIAL" ]]; then
+          ARGS+=("$SEQUENTIAL")
+        fi
+        if [[ -n "${{ inputs.npm-cmd }}" ]]; then
+          ARGS+=(--npm-cmd "${{ inputs.npm-cmd }}")
+        fi
+
+        npx --yes "@wpsyntex/distribute@${VERSION}" "${ARGS[@]}"
+
+    - name: Resolve ZIP path
+      id: name
+      shell: bash
+      run: |
+        shopt -s nullglob
+        zips=(dist/*.zip)
+        if [[ ${#zips[@]} -eq 0 ]]; then
+          echo "::error::No ZIP file found in dist/"
+          exit 1
+        fi
+        if [[ ${#zips[@]} -gt 1 ]]; then
+          echo "::warning::Multiple ZIP files found in dist/; using ${zips[0]}"
+        fi
+        zip_path="${zips[0]}"
+        artifact_name="$(basename "$zip_path" .zip)"
+        echo "zip-path=${zip_path}" >> "$GITHUB_OUTPUT"
+        echo "artifact-name=${artifact_name}" >> "$GITHUB_OUTPUT"
+
+    - name: Upload artifact
+      id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.name.outputs.artifact-name }}
+        path: ${{ steps.name.outputs.zip-path }}
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: error
+
+    - name: Write job summary
+      shell: bash
+      run: |
+        {
+          echo "## Distribution ZIP"
+          echo ""
+          echo "| | |"
+          echo "|---|---|"
+          echo "| Mode | \`${{ inputs.mode }}\` |"
+          echo "| Version | \`${{ inputs.version }}\` |"
+          echo "| Artifact | \`${{ steps.name.outputs.artifact-name }}\` |"
+          if [[ -n "${{ steps.upload.outputs.artifact-url }}" ]]; then
+            echo "| Download | [${{ steps.name.outputs.artifact-name }}](${{ steps.upload.outputs.artifact-url }}) |"
+          else
+            echo "| Run | [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Post console notice
+      shell: bash
+      run: |
+        URL="${{ steps.upload.outputs.artifact-url }}"
+        if [[ -z "$URL" ]]; then
+          URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        fi
+        echo "::notice title=Distribution ready::Download at ${URL}"
+
+    - name: Comment on pull request
+      if: success()
+      continue-on-error: true
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const marker = '<!-- polylang-distribute-zip -->';
+          const mode = '${{ inputs.mode }}';
+          const artifactName = '${{ steps.name.outputs.artifact-name }}';
+          let downloadUrl = '${{ steps.upload.outputs.artifact-url }}';
+          if (!downloadUrl) {
+            downloadUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+          }
+          const sha = context.sha.substring(0, 7);
+
+          const body = [
+            marker,
+            `📦 **Distribution ZIP** (\`${mode}\`)`,
+            '',
+            `Download: [${artifactName}](${downloadUrl})`,
+            '',
+            `Built from commit \`${sha}\`.`,
+          ].join('\n');
+
+          let prNumber = null;
+
+          if (context.eventName === 'pull_request') {
+            prNumber = context.payload.pull_request?.number;
+          } else {
+            const branch = context.ref.replace('refs/heads/', '');
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${branch}`,
+              state: 'open',
+            });
+            if (pulls.length > 0) {
+              prNumber = pulls[0].number;
+            }
+          }
+
+          if (!prNumber) {
+            core.info('No open pull request found; skipping comment.');
+            return;
+          }
+
+          const commentQuery = `query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $number) {
+                comments(first: 100, after: $cursor) {
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
+                  nodes {
+                    id
+                    body
+                  }
+                }
+              }
+            }
+          }`;
+
+          let existing = null;
+          let cursor = null;
+
+          do {
+            const { repository } = await github.graphql(commentQuery, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              number: prNumber,
+              cursor,
+            });
+
+            const comments = repository.pullRequest.comments;
+            existing = comments.nodes.find((c) => c.body?.includes(marker));
+
+            if (existing || !comments.pageInfo.hasNextPage) {
+              break;
+            }
+
+            cursor = comments.pageInfo.endCursor;
+          } while (true);
+
+          if (existing) {
+            await github.graphql(
+              `mutation($id: ID!, $body: String!) {
+                updateIssueComment(input: { id: $id, body: $body }) {
+                  issueComment {
+                    id
+                  }
+                }
+              }`,
+              { id: existing.id, body }
+            );
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+          }
