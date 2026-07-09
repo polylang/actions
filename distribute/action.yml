@@ -209,23 +209,55 @@ runs:
             return;
           }
 
-          const { data: comments } = await github.rest.issues.listComments({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: prNumber,
-          });
+          const commentQuery = `query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $number) {
+                comments(first: 100, after: $cursor) {
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
+                  nodes {
+                    id
+                    body
+                  }
+                }
+              }
+            }
+          }`;
 
-          const existing = comments.find(
-            (c) => c.user.type === 'Bot' && c.body?.includes(marker)
-          );
+          let existing = null;
+          let cursor = null;
 
-          if (existing) {
-            await github.rest.issues.updateComment({
+          do {
+            const { repository } = await github.graphql(commentQuery, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              comment_id: existing.id,
-              body,
+              number: prNumber,
+              cursor,
             });
+
+            const comments = repository.pullRequest.comments;
+            existing = comments.nodes.find((c) => c.body?.includes(marker));
+
+            if (existing || !comments.pageInfo.hasNextPage) {
+              break;
+            }
+
+            cursor = comments.pageInfo.endCursor;
+          } while (true);
+
+          if (existing) {
+            await github.graphql(
+              `mutation($id: ID!, $body: String!) {
+                updateIssueComment(input: { id: $id, body: $body }) {
+                  issueComment {
+                    id
+                  }
+                }
+              }`,
+              { id: existing.id, body }
+            );
           } else {
             await github.rest.issues.createComment({
               owner: context.repo.owner,
