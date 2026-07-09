@@ -83,8 +83,6 @@ runs:
     - name: Run distribute
       id: distribute
       shell: bash
-      env:
-        COMPOSER_AUTH: ${{ env.COMPOSER_AUTH }}
       run: |
         if [[ ! -f package.json ]]; then
           echo "::error::package.json is required"
