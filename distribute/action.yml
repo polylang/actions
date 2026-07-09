@@ -6,7 +6,8 @@
 #        contents: read          # checkout
 #        actions: write          # upload artifact
 #        pull-requests: write    # PR comment (optional if no PR context)
-#   3. env COMPOSER_AUTH on the step (if private Composer packages)
+#   3. @wpsyntex/distribute in devDependencies (installed via npm ci/install)
+#   4. env COMPOSER_AUTH on the step (if private Composer packages)
 
 name: Build distribution ZIP
 description: |
@@ -22,7 +23,8 @@ description: |
   ```
 
   **Prerequisites:** run `actions/checkout@v4` with `fetch-depth: 0` before
-  this action. Pass `COMPOSER_AUTH` via `env` if needed.
+  this action. Add `@wpsyntex/distribute` to `devDependencies`. Pass
+  `COMPOSER_AUTH` via `env` if needed.
 
 inputs:
   mode:
@@ -86,16 +88,6 @@ runs:
           npm install
         fi
 
-    - name: Install @wpsyntex/distribute
-      shell: bash
-      run: |
-        VERSION=$(node -p "try { require('./package.json').devDependencies['@wpsyntex/distribute'] } catch(e) { '' }" 2>/dev/null || echo "")
-        if [[ -n "$VERSION" ]]; then
-          npm install -D "@wpsyntex/distribute@${VERSION}"
-        else
-          npm install -D @wpsyntex/distribute@latest
-        fi
-
     - name: Run distribute
       id: distribute
       shell: bash
@@ -115,7 +107,7 @@ runs:
           ARGS+=(--npm-cmd "${{ inputs.npm-cmd }}")
         fi
 
-        npx distribute "${ARGS[@]}"
+        npx --no-install distribute "${ARGS[@]}"
 
     - name: Resolve ZIP path
       id: name
