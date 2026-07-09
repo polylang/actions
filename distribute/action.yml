@@ -10,7 +10,7 @@
 
 name: Build distribution ZIP
 description: |
-  Builds a WordPress plugin distribution ZIP using @wpsyntex/distribute,
+  Builds a WordPress plugin/theme distribution ZIP using @wpsyntex/distribute,
   uploads it as a GitHub Actions artifact, and posts a download link.
 
   **Caller workflow must set job permissions:**
@@ -34,7 +34,7 @@ inputs:
     required: false
     default: commit
   npm-cmd:
-    description: Override npm script to run.
+    description: Override npm build script to run.
     required: false
   node-version:
     description: Node.js version.
