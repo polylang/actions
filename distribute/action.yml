@@ -6,7 +6,7 @@
 #        contents: read          # checkout
 #        actions: write          # upload artifact
 #        pull-requests: write    # PR comment (optional if no PR context)
-#   3. @wpsyntex/distribute in devDependencies (installed via npm ci/install)
+#   3. @wpsyntex/distribute in devDependencies (distribute installs npm deps during build)
 #   4. env COMPOSER_AUTH on the step (if private Composer packages)
 
 name: Build distribution ZIP
@@ -23,8 +23,9 @@ description: |
   ```
 
   **Prerequisites:** run `actions/checkout@v4` with `fetch-depth: 0` before
-  this action. Add `@wpsyntex/distribute` to `devDependencies`. Pass
-  `COMPOSER_AUTH` via `env` if needed.
+  this action. Add `@wpsyntex/distribute` to `devDependencies`; it installs
+  consumer npm dependencies during the build. Pass `COMPOSER_AUTH` via `env`
+  if needed.
 
 inputs:
   mode:
@@ -79,21 +80,23 @@ runs:
         node-version: ${{ inputs.node-version }}
         cache: npm
 
-    - name: Install consumer npm dependencies
-      shell: bash
-      run: |
-        if [[ -f package-lock.json ]]; then
-          npm ci
-        elif [[ -f package.json ]]; then
-          npm install
-        fi
-
     - name: Run distribute
       id: distribute
       shell: bash
       env:
         COMPOSER_AUTH: ${{ env.COMPOSER_AUTH }}
       run: |
+        if [[ ! -f package.json ]]; then
+          echo "::error::package.json is required"
+          exit 1
+        fi
+
+        VERSION=$(node -p "require('./package.json').devDependencies?.['@wpsyntex/distribute'] || ''" 2>/dev/null || echo "")
+        if [[ -z "$VERSION" ]]; then
+          echo "::error::Add @wpsyntex/distribute to devDependencies in package.json"
+          exit 1
+        fi
+
         SEQUENTIAL=""
         if [[ "${RUNNER_DEBUG}" == "1" || "${ACTIONS_STEP_DEBUG}" == "true" || "${ACTIONS_RUNNER_DEBUG}" == "true" ]]; then
           SEQUENTIAL="--sequential"
@@ -107,7 +110,7 @@ runs:
           ARGS+=(--npm-cmd "${{ inputs.npm-cmd }}")
         fi
 
-        npx --no-install distribute "${ARGS[@]}"
+        npx --yes "@wpsyntex/distribute@${VERSION}" "${ARGS[@]}"
 
     - name: Resolve ZIP path
       id: name
