@@ -215,6 +215,12 @@ runs:
 
           if (context.eventName === 'pull_request') {
             prNumber = context.payload.pull_request?.number;
+          } else if (
+            context.eventName === 'issue_comment' &&
+            context.payload.issue?.pull_request
+          ) {
+            // issue_comment runs on the default branch ref, not the PR head.
+            prNumber = context.issue.number;
           } else {
             const branch = context.ref.replace('refs/heads/', '');
             const { data: pulls } = await github.rest.pulls.list({
