@@ -49,6 +49,10 @@ inputs:
     description: Artifact retention in days.
     required: false
     default: "30"
+  initiator:
+    description: GitHub username to mention in the pull request comment.
+    required: false
+    default: ""
 
 outputs:
   artifact-name:
@@ -189,6 +193,7 @@ runs:
       with:
         script: |
           const marker = '<!-- polylang-distribute-zip -->';
+          const initiator = '${{ inputs.initiator }}';
           const artifactName = '${{ steps.name.outputs.artifact-name }}';
           let downloadUrl = '${{ steps.upload.outputs.artifact-url }}';
           if (!downloadUrl) {
@@ -196,14 +201,24 @@ runs:
           }
           const sha = context.sha.substring(0, 7);
 
-          const body = [
+          const bodyParts = [
             marker,
             `📦 **Distribution ZIP**`,
             '',
+          ];
+
+          if (initiator) {
+            bodyParts.push(`@${initiator}, your distribution ZIP is ready to download.`);
+            bodyParts.push('');
+          }
+
+          bodyParts.push(
             `Download: [${artifactName}](${downloadUrl})`,
             '',
             `Built from commit \`${sha}\`.`,
-          ].join('\n');
+          );
+
+          const body = bodyParts.join('\n');
 
           let prNumber = null;
 
