@@ -30,10 +30,6 @@ description: |
   if needed.
 
 inputs:
-  mode:
-    description: Distribution mode (production or dev).
-    required: false
-    default: production
   version:
     description: Version strategy (commit, tag) or literal string.
     required: false
@@ -123,7 +119,7 @@ runs:
           SEQUENTIAL="--sequential"
         fi
 
-        ARGS=(--mode "${{ inputs.mode }}" --version "${{ inputs.version }}")
+        ARGS=(--version "${{ inputs.version }}")
         if [[ -n "$SEQUENTIAL" ]]; then
           ARGS+=("$SEQUENTIAL")
         fi
@@ -168,7 +164,6 @@ runs:
           echo ""
           echo "| | |"
           echo "|---|---|"
-          echo "| Mode | \`${{ inputs.mode }}\` |"
           echo "| Version | \`${{ inputs.version }}\` |"
           echo "| Artifact | \`${{ steps.name.outputs.artifact-name }}\` |"
           if [[ -n "${{ steps.upload.outputs.artifact-url }}" ]]; then
@@ -194,7 +189,6 @@ runs:
       with:
         script: |
           const marker = '<!-- polylang-distribute-zip -->';
-          const mode = '${{ inputs.mode }}';
           const artifactName = '${{ steps.name.outputs.artifact-name }}';
           let downloadUrl = '${{ steps.upload.outputs.artifact-url }}';
           if (!downloadUrl) {
@@ -204,7 +198,7 @@ runs:
 
           const body = [
             marker,
-            `📦 **Distribution ZIP** (\`${mode}\`)`,
+            `📦 **Distribution ZIP**`,
             '',
             `Download: [${artifactName}](${downloadUrl})`,
             '',
