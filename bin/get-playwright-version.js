@@ -18,22 +18,32 @@
  * - Exits with code 1 and writes an error message to stderr when the version cannot be determined.
  */
 
-const tryRequire = ( id ) => {
+const fs = require( 'fs' );
+const path = require( 'path' );
+
+/**
+ * @param {string} filePath
+ * @return {Object|null}
+ */
+const tryReadJson = ( filePath ) => {
 	try {
-		return require( id );
+		return JSON.parse( fs.readFileSync( filePath, 'utf8' ) );
 	} catch {
 		return null;
 	}
 };
 
-const fromPackage = tryRequire( '@playwright/test/package.json' );
+const root = process.cwd();
+const fromPackage = tryReadJson(
+	path.join( root, 'node_modules', '@playwright', 'test', 'package.json' )
+);
 
 if ( fromPackage?.version ) {
 	process.stdout.write( fromPackage.version );
 	process.exit( 0 );
 }
 
-const lock = tryRequire( './package-lock.json' );
+const lock = tryReadJson( path.join( root, 'package-lock.json' ) );
 const fromLock = lock?.packages?.['node_modules/@playwright/test']?.version
 	|| lock?.dependencies?.['@playwright/test']?.version
 	|| '';
