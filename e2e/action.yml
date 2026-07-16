@@ -3,11 +3,6 @@ name: Run Playwright e2e Tests
 description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. Currently runs on PHP 8.0 with WordPress latest release.
 
 inputs:
-  container-cache-key:
-    description: Container cache key. Used to cache wp-env container.
-    required: false
-    type: string
-    default: 'no-external-cache-key'
   wp-env-config-path:
     description: Path to a custom wp-env config file passed to wp-env --config. Default is '' (wp-env default discovery).
     required: false
@@ -99,25 +94,6 @@ runs:
       shell: bash
       if: steps.playwright-cache.outputs.cache-hit != 'true'
 
-    - name: Get WordPress latest version
-      id: wp-version
-      run: |
-        echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> $GITHUB_ENV
-      shell: bash
-
-    - name: Cache wp-env Docker image
-      id: docker-cache
-      uses: actions/cache@v4
-      with:
-        path: wp-env-image.tar
-        key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json', '.wp-env.override.json', inputs.wp-env-config-path) }}-${{ inputs.container-cache-key }}
-
-    - name: Load cached Docker image (if any)
-      if: steps.docker-cache.outputs.cache-hit == 'true'
-      run: |
-        docker load -i wp-env-image.tar
-      shell: bash
-
     - name: Install WordPress and start the server
       run: |
         if [ -n "${{ inputs.wp-env-config-path }}" ]; then
@@ -127,17 +103,7 @@ runs:
         fi
       shell: bash
 
-    - name: Save Docker image to cache
-      if: steps.docker-cache.outputs.cache-hit != 'true'
-      run: |
-        if [ -n "${{ inputs.wp-env-config-path }}" ]; then
-          node "${{ github.action_path }}/../bin/save-wp-env-docker-images.js" --config="${{ inputs.wp-env-config-path }}"
-        else
-          node "${{ github.action_path }}/../bin/save-wp-env-docker-images.js"
-        fi
-      shell: bash
-
-    - name: Run Playwright tests with WordPress ${{ env.WP_VERSION }}
+    - name: Run Playwright tests
       run: ${{ inputs.playwright-cmd }}
       shell: bash
 
