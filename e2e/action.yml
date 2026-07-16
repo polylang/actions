@@ -33,7 +33,9 @@ runs:
       run: echo "NODE_VERSION=$(node -v)" >> "$GITHUB_OUTPUT"
       shell: bash
 
+    # Repos without a committed lockfile (e.g. Polylang) need one for npm ci / cache key.
     - name: Set up package-lock.json
+      if: hashFiles('package-lock.json') == ''
       run: |
         npm install --package-lock-only --no-audit
       shell: bash
@@ -48,7 +50,11 @@ runs:
     - name: Install dependencies
       if: ${{ steps.cache-node_modules.outputs.cache-hit != 'true' }}
       run: |
+        if [ -f package-lock.json ]; then
           npm ci
+        else
+          npm install --no-audit
+        fi
       shell: bash
 
     # Must install PHP deps before wp-env is running to prevent errors.
