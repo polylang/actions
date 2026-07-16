@@ -4,7 +4,9 @@
  * Save wp-env Docker images to a tarball for GitHub Actions caching.
  *
  * Used by polylang/actions/e2e after `wp-env start`. Resolves the wp-env work
- * directory via `wp-env status --json`, then saves images from its docker-compose.yml.
+ * directory via `wp-env status --json` (@wordpress/env 11+), falling back to
+ * `wp-env install-path` on older versions, then saves images from its
+ * docker-compose.yml.
  *
  * @example
  * node "${{ github.action_path }}/../bin/save-wp-env-docker-images.js"
@@ -32,34 +34,49 @@ const COMPOSE_FILENAME = 'docker-compose.yml';
  * @return {string}
  */
 const getInstallPath = ( configPath ) => {
-	let output;
+	const configArgs = configPath ? [ `--config=${ configPath }` ] : [];
 
 	try {
-		output = execFileSync(
+		const output = execFileSync(
 			'npm',
-			[ 'run', 'wp-env', '--', 'status', '--json', ...( configPath ? [ `--config=${ configPath }` ] : [] ) ],
+			[ 'run', 'wp-env', '--', 'status', '--json', ...configArgs ],
 			{ encoding: 'utf8' }
 		);
-	} catch {
-		process.stderr.write( 'Could not resolve wp-env install path.\n' );
-		process.exit( 1 );
-	}
+		const jsonStart = output.indexOf( '{' );
+		const jsonEnd = output.lastIndexOf( '}' );
 
-	let status;
+		if ( jsonStart !== -1 && jsonEnd > jsonStart ) {
+			const status = JSON.parse( output.slice( jsonStart, jsonEnd + 1 ) );
+
+			if ( status?.installPath ) {
+				return status.installPath;
+			}
+		}
+	} catch {
+		// Fall through: `status --json` is only available in @wordpress/env 11+.
+	}
 
 	try {
-		status = JSON.parse( output.trim() );
+		const output = execFileSync(
+			'npm',
+			[ 'run', 'wp-env', '--', 'install-path', ...configArgs ],
+			{ encoding: 'utf8' }
+		);
+		// May include npm run banners; keep the first absolute path line.
+		const installPath = output
+			.split( '\n' )
+			.map( ( entry ) => entry.trim() )
+			.find( ( entry ) => entry.startsWith( '/' ) || /^[A-Za-z]:[\\/]/.test( entry ) );
+
+		if ( installPath ) {
+			return installPath;
+		}
 	} catch {
-		process.stderr.write( 'Could not parse wp-env status output.\n' );
-		process.exit( 1 );
+		// Handled below.
 	}
 
-	if ( ! status?.installPath ) {
-		process.stderr.write( 'wp-env status did not return an install path.\n' );
-		process.exit( 1 );
-	}
-
-	return status.installPath;
+	process.stderr.write( 'Could not resolve wp-env install path.\n' );
+	process.exit( 1 );
 };
 
 /**
