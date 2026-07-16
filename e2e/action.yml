@@ -35,9 +35,10 @@ runs:
 
     # Repos without a committed lockfile (e.g. Polylang) need one for npm ci / cache key.
     - name: Set up package-lock.json
-      if: hashFiles('package-lock.json') == ''
       run: |
-        npm install --package-lock-only --no-audit
+        if [ ! -f package-lock.json ]; then
+          npm install --package-lock-only --no-audit
+        fi
       shell: bash
 
     - name: Cache node_modules
