@@ -3,11 +3,11 @@ name: Run Playwright e2e Tests
 description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. Currently runs on PHP 8.0 with WordPress latest release.
 
 inputs:
-  container-cache-key:
-    description: Container cache key. Used to cache wp-env container.
+  wp-env-cache-key:
+    description: Extra cache key fragment for the wp-env home directory. Use for inputs not reflected in .wp-env.json (e.g. WooCommerce version, Polylang Pro commit).
     required: false
     type: string
-    default: 'no-external-cache-key'
+    default: 'default'
 
 runs:
   using: 'composite'
@@ -18,9 +18,17 @@ runs:
       with:
         node-version: 22
 
+    - name: Get Node.js version
+      id: node-version
+      run: echo "NODE_VERSION=$(node -v)" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    # Repos without a committed lockfile (e.g. Polylang) need one for npm ci / cache key.
     - name: Set up package-lock.json
       run: |
-        npm install --package-lock-only --no-audit
+        if [ ! -f package-lock.json ]; then
+          npm install --package-lock-only --no-audit
+        fi
       shell: bash
 
     - name: Cache node_modules
@@ -28,12 +36,16 @@ runs:
       uses: actions/cache@v4
       with:
           path: '**/node_modules'
-          key: node_modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+          key: node_modules-${{ runner.os }}-${{ runner.arch }}-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('package.json', 'package-lock.json') }}
 
     - name: Install dependencies
       if: ${{ steps.cache-node_modules.outputs.cache-hit != 'true' }}
       run: |
+        if [ -f package-lock.json ]; then
           npm ci
+        else
+          npm install --no-audit
+        fi
       shell: bash
 
     # Must install PHP deps before wp-env is running to prevent errors.
@@ -56,7 +68,8 @@ runs:
     - name: Get installed Playwright version
       id: playwright-version
       run: |
-        echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').packages['node_modules/@playwright/test'].version)")" >> $GITHUB_ENV
+        PLAYWRIGHT_VERSION=$(node "${{ github.action_path }}/../bin/get-playwright-version.js")
+        echo "PLAYWRIGHT_VERSION=$PLAYWRIGHT_VERSION" >> "$GITHUB_ENV"
       shell: bash
 
     - name: Cache Playwright binaries
@@ -66,6 +79,8 @@ runs:
         path: |
           ~/.cache/ms-playwright
         key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-
 
     - name: Install Playwright binaries
       # Only Chromium for the moment.
@@ -74,23 +89,40 @@ runs:
       shell: bash
       if: steps.playwright-cache.outputs.cache-hit != 'true'
 
+    # Pin home so CI does not depend on /snap detection (~/wp-env vs ~/.wp-env).
+    # Same WP_ENV_HOME behavior in @wordpress/env 10 and 11.
+    - name: Set wp-env home directory
+      run: echo "WP_ENV_HOME=${HOME}/.wp-env" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Get @wordpress/env version
+      id: wp-env-version
+      run: |
+        echo "WP_ENV_VERSION=$(node -e "console.log(require('@wordpress/env/package.json').version)")" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    # When core is "latest" (null), bust the workdir cache when WordPress.org ships a new release.
     - name: Get WordPress latest version
       id: wp-version
       run: |
-        echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> $GITHUB_ENV
+        echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> "$GITHUB_ENV"
       shell: bash
 
-    - name: Cache wp-env Docker image
-      id: docker-cache
+    # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(.wp-env.json)}-{wp-env-cache-key}
+    - name: Cache wp-env home
+      id: wp-env-home-cache
       uses: actions/cache@v4
       with:
-        path: wp-env-image.tar
-        key: ${{ runner.os }}-wp-env-${{ env.WP_VERSION }}-${{ inputs.container-cache-key }}
+        path: ${{ env.WP_ENV_HOME }}
+        key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json') }}-${{ inputs.wp-env-cache-key }}
 
-    - name: Load cached Docker image (if any)
-      if: steps.docker-cache.outputs.cache-hit == 'true'
-      run: |
-        docker load -i wp-env-image.tar
+    # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
+    # On a cache hit the config checksum makes wp-env skip `wp core install` against
+    # empty DB volumes → REST API / rewrite failures. Drop the checksum so start
+    # reconfigures while still reusing downloaded sources (wp-env 10 and 11).
+    - name: Force wp-env reconfigure after home cache restore
+      if: steps.wp-env-home-cache.outputs.cache-hit == 'true'
+      run: find "${WP_ENV_HOME}" -name 'wp-env-cache.json' -delete
       shell: bash
 
     - name: Install WordPress and start the server
@@ -99,13 +131,6 @@ runs:
       shell: bash
       env:
         WP_ENV_PHP_VERSION: '8.0'
-
-    - name: Save Docker image to cache
-      if: steps.docker-cache.outputs.cache-hit != 'true'
-      run: |
-        docker image ls
-        docker save $(docker images --format '{{.Repository}}:{{.Tag}}') -o wp-env-image.tar
-      shell: bash
 
     - name: Run Playwright tests
       run: |
