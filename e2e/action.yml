@@ -120,10 +120,20 @@ runs:
 
     # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(.wp-env.json)}-{hash(custom config)|no-custom-config}-{wp-env-cache-key}
     - name: Cache wp-env home
+      id: wp-env-home-cache
       uses: actions/cache@v4
       with:
         path: ${{ env.WP_ENV_HOME }}
         key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json') }}-${{ inputs.wp-env-config-path != '' && hashFiles(inputs.wp-env-config-path) || 'no-custom-config' }}-${{ inputs.wp-env-cache-key }}
+
+    # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
+    # On a cache hit the config checksum makes wp-env skip `wp core install` against
+    # empty DB volumes → REST API / rewrite failures. Drop the checksum so start
+    # reconfigures while still reusing downloaded sources (wp-env 10 and 11).
+    - name: Force wp-env reconfigure after home cache restore
+      if: steps.wp-env-home-cache.outputs.cache-hit == 'true'
+      run: find "${WP_ENV_HOME}" -name 'wp-env-cache.json' -delete
+      shell: bash
 
     - name: Install WordPress and start the server
       run: |
