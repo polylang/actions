@@ -3,6 +3,11 @@ name: Run Playwright e2e Tests
 description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. Currently runs on PHP 8.0 with WordPress latest release.
 
 inputs:
+  wp-env-cache-key:
+    description: Extra cache key fragment for the wp-env home directory. Use for inputs not reflected in .wp-env.json (e.g. WooCommerce version, Polylang Pro commit).
+    required: false
+    type: string
+    default: 'default'
   wp-env-config-path:
     description: Path to a custom wp-env config file passed to wp-env --config. Default is '' (wp-env default discovery).
     required: false
@@ -93,6 +98,32 @@ runs:
         npx playwright install chromium --with-deps
       shell: bash
       if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+    # Pin home so CI does not depend on /snap detection (~/wp-env vs ~/.wp-env).
+    # Same WP_ENV_HOME behavior in @wordpress/env 10 and 11.
+    - name: Set wp-env home directory
+      run: echo "WP_ENV_HOME=${HOME}/.wp-env" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Get @wordpress/env version
+      id: wp-env-version
+      run: |
+        echo "WP_ENV_VERSION=$(node -e "console.log(require('@wordpress/env/package.json').version)")" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    # When core is "latest" (null), bust the workdir cache when WordPress.org ships a new release.
+    - name: Get WordPress latest version
+      id: wp-version
+      run: |
+        echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> "$GITHUB_ENV"
+      shell: bash
+
+    # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(.wp-env.json)}-{hash(custom config)|no-custom-config}-{wp-env-cache-key}
+    - name: Cache wp-env home
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.WP_ENV_HOME }}
+        key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json') }}-${{ inputs.wp-env-config-path != '' && hashFiles(inputs.wp-env-config-path) || 'no-custom-config' }}-${{ inputs.wp-env-cache-key }}
 
     - name: Install WordPress and start the server
       run: |
