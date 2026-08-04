@@ -35,7 +35,12 @@ runs:
         node-version: 20
 
     - name: Install dependencies
-      run: npm install
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install --no-audit
+        fi
       shell: bash
 
     - name: Analyze JS
