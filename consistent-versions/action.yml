@@ -29,10 +29,6 @@ inputs:
     description: Path to the tag consistent-versions config file.
     required: false
     default: consistent-versions-tag.yaml
-  package-version:
-    description: Composer constraint for szepeviktor/consistent-versions.
-    required: false
-    default: "^1.2"
 
 runs:
   using: composite
@@ -46,7 +42,7 @@ runs:
 
     - name: Install Consistent Versions
       run: |
-        composer global require --no-interaction --prefer-dist "szepeviktor/consistent-versions:${{ inputs.package-version }}"
+        composer global require --no-interaction --prefer-dist "szepeviktor/consistent-versions:^1.2"
         echo "$(composer global config bin-dir --absolute)" >> "$GITHUB_PATH"
       shell: bash
 
@@ -56,5 +52,10 @@ runs:
 
     - name: Check Git tag
       if: github.ref_type == 'tag'
-      run: consistent-versions check "${{ inputs.tag-config }}"
+      run: |
+        if [ ! -f "${{ inputs.tag-config }}" ]; then
+          echo "Skipping tag check: ${{ inputs.tag-config }} not found."
+          exit 0
+        fi
+        consistent-versions check "${{ inputs.tag-config }}"
       shell: bash
