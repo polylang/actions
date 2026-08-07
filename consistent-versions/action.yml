@@ -1,0 +1,60 @@
+# actions/consistent-versions/action.yml
+#
+# Prerequisites (caller workflow):
+#   1. actions/checkout@v4 (before this action)
+#   2. Project-level consistent-versions.yaml (and optionally
+#      consistent-versions-tag.yaml for tag pushes)
+#   3. Job permissions: contents: read
+
+name: Check Consistent Versions
+
+description: |
+  Installs szepeviktor/consistent-versions globally and checks that version
+  declarations across project files agree. On tag pushes, optionally runs an
+  extra config that compares the Git tag to the declared release version.
+
+  **Caller workflow must check out the repository first** and provide its own
+  `consistent-versions.yaml` (config is not shipped with this action).
+
+inputs:
+  php-version:
+    description: PHP version used to run the checker.
+    required: false
+    default: "8.1"
+  config:
+    description: Path to the main consistent-versions config file.
+    required: false
+    default: consistent-versions.yaml
+  tag-config:
+    description: Path to the tag consistent-versions config file.
+    required: false
+    default: consistent-versions-tag.yaml
+  package-version:
+    description: Composer constraint for szepeviktor/consistent-versions.
+    required: false
+    default: "^1.2"
+
+runs:
+  using: composite
+
+  steps:
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php-version }}
+        coverage: none
+
+    - name: Install Consistent Versions
+      run: |
+        composer global require --no-interaction --prefer-dist "szepeviktor/consistent-versions:${{ inputs.package-version }}"
+        echo "$(composer global config bin-dir --absolute)" >> "$GITHUB_PATH"
+      shell: bash
+
+    - name: Check version consistency
+      run: consistent-versions check "${{ inputs.config }}"
+      shell: bash
+
+    - name: Check Git tag
+      if: github.ref_type == 'tag'
+      run: consistent-versions check "${{ inputs.tag-config }}"
+      shell: bash

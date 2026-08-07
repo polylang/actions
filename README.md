@@ -6,3 +6,4 @@ Shared GitHub actions for Polylang projects. Provides the following actions:
 - JS and CSS Coding Standard (ESLint)
 - Slack Notifications
 - Distribute
+- Consistent Versions
