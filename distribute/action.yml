@@ -56,7 +56,7 @@ inputs:
 
 outputs:
   artifact-name:
-    description: Uploaded artifact name.
+    description: Uploaded artifact filename (includes .zip extension).
     value: ${{ steps.name.outputs.artifact-name }}
   artifact-url:
     description: Authenticated download URL for the ZIP artifact.
@@ -147,16 +147,18 @@ runs:
           echo "::warning::Multiple ZIP files found in dist/; using ${zips[0]}"
         fi
         zip_path="${zips[0]}"
-        artifact_name="$(basename "$zip_path" .zip)"
+        artifact_name="$(basename "$zip_path")"
         echo "zip-path=${zip_path}" >> "$GITHUB_OUTPUT"
         echo "artifact-name=${artifact_name}" >> "$GITHUB_OUTPUT"
 
+    # archive: false stores the raw .zip file so browser/API downloads are not
+    # wrapped in an outer zip (which would produce zip-in-zip and break WordPress install).
     - name: Upload artifact
       id: upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: ${{ steps.name.outputs.artifact-name }}
         path: ${{ steps.name.outputs.zip-path }}
+        archive: false
         retention-days: ${{ inputs.retention-days }}
         if-no-files-found: error
 
