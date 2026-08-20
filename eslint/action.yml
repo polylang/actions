@@ -1,6 +1,6 @@
 name: Run ESLint Static Analysis
 
-description: Sets up Node and its dependencies then run ESLint on JS files using wordpress/scripts package.
+description: Sets up Node and its dependencies then run ESLint on JS files (npm run lint:js, or eslint as a fallback).
 
 inputs:
   do-js:
@@ -32,7 +32,7 @@ runs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
 
     - name: Install dependencies
       run: |
@@ -46,7 +46,12 @@ runs:
     - name: Analyze JS
       if: ${{ inputs.do-js == 'true' }}
       run: |
-        npx wp-scripts lint-js ${{ inputs.js-path }}
+        # npm pkg get scripts.lint:js prints {} when the script is missing; read package.json instead.
+        if node -e "process.exit(require('./package.json').scripts?.['lint:js'] ? 0 : 1)"; then
+          npm run lint:js -- ${{ inputs.js-path }}
+        else
+          npx eslint ${{ inputs.js-path }}
+        fi
       shell: bash
 
     - name: Analyze CSS and Saas
@@ -54,4 +59,3 @@ runs:
       run: |
         npx wp-scripts lint-style ${{ inputs.style-path }}
       shell: bash
-
