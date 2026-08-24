@@ -142,5 +142,9 @@ runs:
       if: ${{ !cancelled() }}
       with:
         name: playwright-report
-        path: playwright-report/
+        # Config lives under tests/e2e/, so Playwright writes the HTML report and
+        # failure attachments (screenshots, snapshot diffs, traces) there — not repo root.
+        path: |
+          tests/e2e/playwright-report/
+          tests/e2e/test-results/
         retention-days: 7
