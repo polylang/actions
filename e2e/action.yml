@@ -139,7 +139,7 @@ runs:
 
     - name: Upload Playwright report
       uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
+      if: ${{ failure() }}
       with:
         name: playwright-report
         # Config lives under tests/e2e/, so Playwright writes the HTML report and
