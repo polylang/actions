@@ -1,6 +1,6 @@
 name: Run Playwright e2e Tests
 
-description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. Currently runs on PHP 8.0 with WordPress latest release.
+description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. PHP version is read from the consumer repo .wp-env.json.
 
 inputs:
   wp-env-cache-key:
@@ -48,12 +48,19 @@ runs:
         fi
       shell: bash
 
+    - name: Get PHP version from .wp-env.json
+      id: wp-env-php-version
+      run: |
+        PHP_VERSION=$(node "${{ github.action_path }}/../bin/get-wp-env-php-version.js")
+        echo "PHP_VERSION=$PHP_VERSION" >> "$GITHUB_OUTPUT"
+      shell: bash
+
     # Must install PHP deps before wp-env is running to prevent errors.
     - name: Set up PHP
       uses: shivammathur/setup-php@v2
       with:
         coverage: none
-        php-version: '8.0'
+        php-version: ${{ steps.wp-env-php-version.outputs.PHP_VERSION }}
 
     - name: Install PHP Dependencies
       uses: ramsey/composer-install@v3
@@ -129,8 +136,6 @@ runs:
       run: |
         npm run wp-env start
       shell: bash
-      env:
-        WP_ENV_PHP_VERSION: '8.0'
 
     - name: Run Playwright tests
       run: |
