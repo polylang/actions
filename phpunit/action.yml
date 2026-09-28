@@ -45,7 +45,6 @@ runs:
         composer remove --no-interaction --no-update --dev "phpstan/phpstan"
         composer remove --no-interaction --no-update --dev "wpsyntex/polylang-phpstan"
         composer remove --no-interaction --no-update --dev "rector/rector"
-        composer remove --no-interaction --no-update --dev "szepeviktor/consistent-versions"
       shell: bash
 
     - name: Install PHP Dependencies
