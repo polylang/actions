@@ -125,13 +125,22 @@ runs:
         echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> "$GITHUB_ENV"
       shell: bash
 
-    # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(wp-env configs)}-{wp-env-cache-key}
+    # Hash only the config this job starts. Dev and test are separate wp-env
+    # workdirs (wp-env-<project>-dev-* vs -test-*); including .wp-env.dev.json
+    # would bust the test cache without ever creating the dev containers.
+    - name: Get wp-env config hash
+      id: wp-env-config-hash
+      run: |
+        echo "HASH=$(sha256sum "${{ inputs.wp-env-config-path }}" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(started config)}-{wp-env-cache-key}
     - name: Cache wp-env home
       id: wp-env-home-cache
       uses: actions/cache@v4
       with:
         path: ${{ env.WP_ENV_HOME }}
-        key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json', '.wp-env.dev.json', '.wp-env.test.json') }}-${{ inputs.wp-env-cache-key }}
+        key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ steps.wp-env-config-hash.outputs.HASH }}-${{ inputs.wp-env-cache-key }}
 
     # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
     # On a cache hit the config checksum makes wp-env skip `wp core install` against
@@ -142,6 +151,9 @@ runs:
       run: find "${WP_ENV_HOME}" -name 'wp-env-cache.json' -delete
       shell: bash
 
+    # Starts a single stack from wp-env-config-path (consumers pass
+    # .wp-env.test.json). Does not run env:start, which would also boot the
+    # local-only .wp-env.dev.json environment.
     - name: Install WordPress and start the server
       run: |
         npm run wp-env start -- --config="${{ inputs.wp-env-config-path }}"
