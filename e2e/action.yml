@@ -1,13 +1,23 @@
 name: Run Playwright e2e Tests
 
-description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. PHP version is read from the consumer repo .wp-env.json.
+description: Installs WordPress, starts the server, builds dependencies and run Playwright tests. PHP version is read from the consumer wp-env config.
 
 inputs:
   wp-env-cache-key:
-    description: Extra cache key fragment for the wp-env home directory. Use for inputs not reflected in .wp-env.json (e.g. WooCommerce version, Polylang Pro commit).
+    description: Extra cache key fragment for the wp-env home directory. Use for inputs not reflected in wp-env config (e.g. WooCommerce version, Polylang Pro commit).
     required: false
     type: string
     default: 'default'
+  wp-env-config-path:
+    description: Path to the wp-env config file passed to wp-env --config and used to resolve PHP version.
+    required: false
+    type: string
+    default: '.wp-env.json'
+  playwright-cmd:
+    description: CLI command to run playwright tests. Default is 'npm run test:e2e'.
+    required: false
+    type: string
+    default: 'npm run test:e2e'
 
 runs:
   using: 'composite'
@@ -48,10 +58,10 @@ runs:
         fi
       shell: bash
 
-    - name: Get PHP version from .wp-env.json
+    - name: Get PHP version from wp-env config
       id: wp-env-php-version
       run: |
-        PHP_VERSION=$(node "${{ github.action_path }}/../bin/get-wp-env-php-version.js")
+        PHP_VERSION=$(node "${{ github.action_path }}/../bin/get-wp-env-php-version.js" "${{ inputs.wp-env-config-path }}")
         echo "PHP_VERSION=$PHP_VERSION" >> "$GITHUB_OUTPUT"
       shell: bash
 
@@ -115,13 +125,13 @@ runs:
         echo "WP_VERSION=$(node -e "fetch('https://api.wordpress.org/core/version-check/1.7/').then(r => r.json()).then(data => console.log(data.offers[0].current))")" >> "$GITHUB_ENV"
       shell: bash
 
-    # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(.wp-env.json)}-{wp-env-cache-key}
+    # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(wp-env configs)}-{wp-env-cache-key}
     - name: Cache wp-env home
       id: wp-env-home-cache
       uses: actions/cache@v4
       with:
         path: ${{ env.WP_ENV_HOME }}
-        key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json') }}-${{ inputs.wp-env-cache-key }}
+        key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ hashFiles('.wp-env.json', '.wp-env.dev.json', '.wp-env.test.json') }}-${{ inputs.wp-env-cache-key }}
 
     # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
     # On a cache hit the config checksum makes wp-env skip `wp core install` against
@@ -134,12 +144,11 @@ runs:
 
     - name: Install WordPress and start the server
       run: |
-        npm run wp-env start
+        npm run wp-env start -- --config="${{ inputs.wp-env-config-path }}"
       shell: bash
 
     - name: Run Playwright tests
-      run: |
-        npm run test:e2e
+      run: ${{ inputs.playwright-cmd }}
       shell: bash
 
     - name: Upload Playwright report
