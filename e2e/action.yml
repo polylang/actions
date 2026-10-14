@@ -156,7 +156,7 @@ runs:
     # local-only .wp-env.dev.json environment.
     - name: Install WordPress and start the server
       run: |
-        npm run wp-env start -- --config="${{ inputs.wp-env-config-path }}"
+        npx wp-env start -- --config="${{ inputs.wp-env-config-path }}"
       shell: bash
 
     - name: Run Playwright tests
