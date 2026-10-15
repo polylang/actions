@@ -145,11 +145,14 @@ runs:
 
     - name: Install WordPress and start the server
       run: |
-        setup_args=( --config="${{ inputs.wp-env-config-path }}" )
         if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
-          setup_args+=( --with-playwright-browsers )
+          node "${{ github.action_path }}/../bin/run-e2e-parallel-setup.js" \
+            --config="${{ inputs.wp-env-config-path }}" \
+            --with-playwright-browsers
+        else
+          node "${{ github.action_path }}/../bin/run-e2e-parallel-setup.js" \
+            --config="${{ inputs.wp-env-config-path }}"
         fi
-        node "${{ github.action_path }}/../bin/run-e2e-parallel-setup.js" "${setup_args[@]}"
       shell: bash
 
     - name: Run Playwright tests
