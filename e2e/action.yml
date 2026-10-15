@@ -99,7 +99,7 @@ runs:
 
     # Hash only the config this job starts. Dev and test are separate wp-env
     # workdirs (wp-env-<project>-dev-* vs -test-*); including .wp-env.dev.json
-    # would bust the test cache without ever creating the dev containers.
+    # would bust the test cache without ever creating the dev environment.
     - name: Get wp-env config hash
       id: wp-env-config-hash
       run: |
@@ -117,11 +117,7 @@ runs:
           ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ steps.wp-env-config-hash.outputs.HASH }}-${{ inputs.wp-env-cache-key }}
           ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-
 
-    - name: Log wp-env home cache status
-      run: echo "wp-env home cache hit: ${{ steps.wp-env-home-cache.outputs.cache-hit }}"
-      shell: bash
-
-    # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
+    # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not database volumes.
     # On a cache hit the config checksum makes wp-env skip `wp core install` against
     # empty DB volumes → REST API / rewrite failures. Drop the checksum so start
     # reconfigures while still reusing downloaded sources (wp-env 10 and 11).
