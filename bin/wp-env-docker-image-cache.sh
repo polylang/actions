@@ -1,37 +1,47 @@
 #!/usr/bin/env bash
-# Save or load Docker images for a wp-env stack (mariadb + compose-built services).
-# Used by polylang/actions/e2e; avoids caching every image on the runner (see #21).
+# Save or load the MariaDB image used by wp-env (compose service "mysql").
+# WordPress/CLI images are built per job; only mariadb:* is pulled from a registry.
 set -euo pipefail
 
 mode="${1:?usage: wp-env-docker-image-cache.sh save|load [archive-path]}"
-archive="${2:-wp-env-docker-images.tar}"
+archive="${2:-wp-env-mariadb-image.tar}"
 
-list_wp_env_images() {
-	# Images referenced by compose-managed containers (wp-env labels every service).
-	mapfile -t ids < <(
-		docker ps -aq --filter 'label=com.docker.compose.project' 2>/dev/null || true
-	)
-	if ((${#ids[@]} == 0)); then
-		return 0
+list_mariadb_images() {
+	local refs=() ids=()
+
+	# wp-env names the database service "mysql" (image mariadb:<tag>).
+	mapfile -t ids < <(docker ps -aq --filter 'label=com.docker.compose.service=mysql' 2>/dev/null || true)
+	if ((${#ids[@]} > 0)); then
+		mapfile -t refs < <(docker inspect "${ids[@]}" --format '{{.Config.Image}}' | sort -u)
 	fi
-	docker inspect "${ids[@]}" --format '{{.Image}}' | sort -u
+
+	if ((${#refs[@]} == 0)); then
+		mapfile -t refs < <(
+			docker images --format '{{.Repository}}:{{.Tag}}' |
+				grep -E '^mariadb:' |
+				grep -v ':<none>$' |
+				sort -u
+		)
+	fi
+
+	printf '%s\n' "${refs[@]}"
 }
 
 case "$mode" in
 	load)
 		if [[ ! -f "$archive" ]]; then
-			echo "No Docker image archive at ${archive}; skipping load."
+			echo "No MariaDB image archive at ${archive}; skipping load."
 			exit 0
 		fi
 		docker load -i "$archive"
 		;;
 	save)
-		mapfile -t images < <(list_wp_env_images)
+		mapfile -t images < <(list_mariadb_images)
 		if ((${#images[@]} == 0)); then
-			echo "No wp-env Docker images to save."
+			echo "No MariaDB image to save."
 			exit 0
 		fi
-		echo "Saving ${#images[@]} Docker image(s) to ${archive}."
+		echo "Saving MariaDB image(s) to ${archive}: ${images[*]}"
 		docker save "${images[@]}" -o "$archive"
 		;;
 	*)
