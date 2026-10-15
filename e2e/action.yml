@@ -126,25 +126,6 @@ runs:
       run: find "${WP_ENV_HOME}" -name 'wp-env-cache.json' -delete
       shell: bash
 
-    # Starts a single stack from wp-env-config-path (consumers pass
-    # .wp-env.test.json). Overlaps with asset build and Playwright install below.
-    - name: Begin WordPress environment startup
-      run: |
-        set -euo pipefail
-        log="${RUNNER_TEMP}/wp-env-start.log"
-        exit_file="${RUNNER_TEMP}/wp-env-start.exit"
-        (
-          set +e
-          npx wp-env start --config="${{ inputs.wp-env-config-path }}" >"$log" 2>&1
-          echo $? >"$exit_file"
-        ) &
-        echo $! >"${RUNNER_TEMP}/wp-env-start.pid"
-      shell: bash
-
-    - name: Build dependencies
-      run: npm run build --if-present
-      shell: bash
-
     - name: Get installed Playwright version
       id: playwright-version
       run: |
@@ -162,34 +143,13 @@ runs:
         restore-keys: |
           ${{ runner.os }}-playwright-
 
-    - name: Install Playwright binaries
-      # Only Chromium for the moment.
-      run: |
-        npx playwright install chromium --with-deps
-      shell: bash
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
-
-    # Each composite step runs in a new shell; `wait` only works on child PIDs.
     - name: Install WordPress and start the server
       run: |
-        set -euo pipefail
-        log="${RUNNER_TEMP}/wp-env-start.log"
-        exit_file="${RUNNER_TEMP}/wp-env-start.exit"
-        pid=$(cat "${RUNNER_TEMP}/wp-env-start.pid")
-        while kill -0 "$pid" 2>/dev/null; do
-          sleep 2
-        done
-        if [ ! -f "$exit_file" ]; then
-          echo "wp-env wrapper exited before writing status (pid ${pid})." >&2
-          [ -f "$log" ] && cat "$log"
-          exit 1
+        setup_args=( --config="${{ inputs.wp-env-config-path }}" )
+        if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+          setup_args+=( --with-playwright-browsers )
         fi
-        exit_code=$(cat "$exit_file")
-        if [ "$exit_code" -ne 0 ]; then
-          cat "$log"
-          exit "$exit_code"
-        fi
-        cat "$log"
+        node "${{ github.action_path }}/../bin/run-e2e-parallel-setup.js" "${setup_args[@]}"
       shell: bash
 
     - name: Run Playwright tests
