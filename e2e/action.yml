@@ -78,34 +78,6 @@ runs:
         dependency-versions: 'highest'
         composer-options: '--no-dev --optimize-autoloader'
 
-    - name: Build dependencies
-      run: npm run build --if-present
-      shell: bash
-
-    - name: Get installed Playwright version
-      id: playwright-version
-      run: |
-        PLAYWRIGHT_VERSION=$(node "${{ github.action_path }}/../bin/get-playwright-version.js")
-        echo "PLAYWRIGHT_VERSION=$PLAYWRIGHT_VERSION" >> "$GITHUB_ENV"
-      shell: bash
-
-    - name: Cache Playwright binaries
-      uses: actions/cache@v4
-      id: playwright-cache
-      with:
-        path: |
-          ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
-        restore-keys: |
-          ${{ runner.os }}-playwright-
-
-    - name: Install Playwright binaries
-      # Only Chromium for the moment.
-      run: |
-        npx playwright install chromium --with-deps
-      shell: bash
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
-
     # Pin home so CI does not depend on /snap detection (~/wp-env vs ~/.wp-env).
     # Same WP_ENV_HOME behavior in @wordpress/env 10 and 11.
     - name: Set wp-env home directory
@@ -141,6 +113,28 @@ runs:
       with:
         path: ${{ env.WP_ENV_HOME }}
         key: ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ env.WP_VERSION }}-${{ steps.wp-env-config-hash.outputs.HASH }}-${{ inputs.wp-env-cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ steps.wp-env-config-hash.outputs.HASH }}-${{ inputs.wp-env-cache-key }}
+          ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-
+
+    # Key: {os}-wp-env-docker-{@wordpress/env}-{php}-{hash(started config)}-{wp-env-cache-key}
+    - name: Cache wp-env Docker images
+      id: wp-env-docker-cache
+      uses: actions/cache@v4
+      with:
+        path: wp-env-docker-images.tar
+        key: ${{ runner.os }}-wp-env-docker-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ steps.wp-env-php-version.outputs.PHP_VERSION }}-${{ steps.wp-env-config-hash.outputs.HASH }}-${{ inputs.wp-env-cache-key }}
+
+    - name: Load cached wp-env Docker images
+      if: steps.wp-env-docker-cache.outputs.cache-hit == 'true'
+      run: bash "${{ github.action_path }}/../bin/wp-env-docker-image-cache.sh" load
+      shell: bash
+
+    - name: Log wp-env cache status
+      run: |
+        echo "wp-env home cache hit: ${{ steps.wp-env-home-cache.outputs.cache-hit }}"
+        echo "wp-env Docker image cache hit: ${{ steps.wp-env-docker-cache.outputs.cache-hit }}"
+      shell: bash
 
     # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
     # On a cache hit the config checksum makes wp-env skip `wp core install` against
@@ -152,11 +146,56 @@ runs:
       shell: bash
 
     # Starts a single stack from wp-env-config-path (consumers pass
-    # .wp-env.test.json). Does not run env:start, which would also boot the
-    # local-only .wp-env.dev.json environment.
+    # .wp-env.test.json). Overlaps with asset build and Playwright install below.
+    - name: Begin WordPress environment startup
+      run: |
+        set -euo pipefail
+        npx wp-env start --config="${{ inputs.wp-env-config-path }}" >"${RUNNER_TEMP}/wp-env-start.log" 2>&1 &
+        echo $! >"${RUNNER_TEMP}/wp-env-start.pid"
+      shell: bash
+
+    - name: Build dependencies
+      run: npm run build --if-present
+      shell: bash
+
+    - name: Get installed Playwright version
+      id: playwright-version
+      run: |
+        PLAYWRIGHT_VERSION=$(node "${{ github.action_path }}/../bin/get-playwright-version.js")
+        echo "PLAYWRIGHT_VERSION=$PLAYWRIGHT_VERSION" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Cache Playwright binaries
+      uses: actions/cache@v4
+      id: playwright-cache
+      with:
+        path: |
+          ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-
+
+    - name: Install Playwright binaries
+      # Only Chromium for the moment.
+      run: |
+        npx playwright install chromium --with-deps
+      shell: bash
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+
     - name: Install WordPress and start the server
       run: |
-        npx wp-env start --config="${{ inputs.wp-env-config-path }}"
+        set -euo pipefail
+        pid=$(cat "${RUNNER_TEMP}/wp-env-start.pid")
+        if ! wait "$pid"; then
+          cat "${RUNNER_TEMP}/wp-env-start.log"
+          exit 1
+        fi
+        cat "${RUNNER_TEMP}/wp-env-start.log"
+      shell: bash
+
+    - name: Save wp-env Docker images
+      if: steps.wp-env-docker-cache.outputs.cache-hit != 'true'
+      run: bash "${{ github.action_path }}/../bin/wp-env-docker-image-cache.sh" save
       shell: bash
 
     - name: Run Playwright tests
