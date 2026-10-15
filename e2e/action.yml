@@ -150,7 +150,13 @@ runs:
     - name: Begin WordPress environment startup
       run: |
         set -euo pipefail
-        npx wp-env start --config="${{ inputs.wp-env-config-path }}" >"${RUNNER_TEMP}/wp-env-start.log" 2>&1 &
+        log="${RUNNER_TEMP}/wp-env-start.log"
+        exit_file="${RUNNER_TEMP}/wp-env-start.exit"
+        (
+          set +e
+          npx wp-env start --config="${{ inputs.wp-env-config-path }}" >"$log" 2>&1
+          echo $? >"$exit_file"
+        ) &
         echo $! >"${RUNNER_TEMP}/wp-env-start.pid"
       shell: bash
 
@@ -182,15 +188,27 @@ runs:
       shell: bash
       if: steps.playwright-cache.outputs.cache-hit != 'true'
 
+    # Each composite step runs in a new shell; `wait` only works on child PIDs.
     - name: Install WordPress and start the server
       run: |
         set -euo pipefail
+        log="${RUNNER_TEMP}/wp-env-start.log"
+        exit_file="${RUNNER_TEMP}/wp-env-start.exit"
         pid=$(cat "${RUNNER_TEMP}/wp-env-start.pid")
-        if ! wait "$pid"; then
-          cat "${RUNNER_TEMP}/wp-env-start.log"
+        while kill -0 "$pid" 2>/dev/null; do
+          sleep 2
+        done
+        if [ ! -f "$exit_file" ]; then
+          echo "wp-env wrapper exited before writing status (pid ${pid})." >&2
+          [ -f "$log" ] && cat "$log"
           exit 1
         fi
-        cat "${RUNNER_TEMP}/wp-env-start.log"
+        exit_code=$(cat "$exit_file")
+        if [ "$exit_code" -ne 0 ]; then
+          cat "$log"
+          exit "$exit_code"
+        fi
+        cat "$log"
       shell: bash
 
     - name: Save wp-env Docker images
