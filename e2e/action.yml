@@ -106,17 +106,6 @@ runs:
         echo "HASH=$(sha256sum "${{ inputs.wp-env-config-path }}" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       shell: bash
 
-    - name: Get wp-env MariaDB image tag
-      id: wp-env-mariadb-version
-      run: |
-        TAG=$(node -e "
-          const fs = require( 'fs' );
-          const config = JSON.parse( fs.readFileSync( '${{ inputs.wp-env-config-path }}', 'utf8' ) );
-          process.stdout.write( config.mariadbVersion ?? 'lts' );
-        ")
-        echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
-      shell: bash
-
     # Key: {os}-wp-env-home-{@wordpress/env}-{WP latest}-{hash(started config)}-{wp-env-cache-key}
     - name: Cache wp-env home
       id: wp-env-home-cache
@@ -128,23 +117,8 @@ runs:
           ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ steps.wp-env-config-hash.outputs.HASH }}-${{ inputs.wp-env-cache-key }}
           ${{ runner.os }}-wp-env-home-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-
 
-    # Key: {os}-wp-env-mariadb-{@wordpress/env}-{mariadb tag}-{wp-env-cache-key}
-    - name: Cache wp-env MariaDB image
-      id: wp-env-docker-cache
-      uses: actions/cache@v4
-      with:
-        path: wp-env-mariadb-image.tar
-        key: ${{ runner.os }}-wp-env-mariadb-${{ steps.wp-env-version.outputs.WP_ENV_VERSION }}-${{ steps.wp-env-mariadb-version.outputs.TAG }}-${{ inputs.wp-env-cache-key }}
-
-    - name: Load cached wp-env MariaDB image
-      if: steps.wp-env-docker-cache.outputs.cache-hit == 'true'
-      run: bash "${{ github.action_path }}/../bin/wp-env-docker-image-cache.sh" load
-      shell: bash
-
-    - name: Log wp-env cache status
-      run: |
-        echo "wp-env home cache hit: ${{ steps.wp-env-home-cache.outputs.cache-hit }}"
-        echo "wp-env MariaDB image cache hit: ${{ steps.wp-env-docker-cache.outputs.cache-hit }}"
+    - name: Log wp-env home cache status
+      run: echo "wp-env home cache hit: ${{ steps.wp-env-home-cache.outputs.cache-hit }}"
       shell: bash
 
     # WP_ENV_HOME holds WordPress sources + wp-env-cache.json, not MySQL volumes.
@@ -220,11 +194,6 @@ runs:
           exit "$exit_code"
         fi
         cat "$log"
-      shell: bash
-
-    - name: Save wp-env MariaDB image
-      if: steps.wp-env-docker-cache.outputs.cache-hit != 'true'
-      run: bash "${{ github.action_path }}/../bin/wp-env-docker-image-cache.sh" save
       shell: bash
 
     - name: Run Playwright tests
